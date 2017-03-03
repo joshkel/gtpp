@@ -6,27 +6,36 @@ import re
 import sys
 
 
-def handle(regex):
-    if isinstance(regex, str):
-        regex = re.compile(regex)
+class LineHandler(object):
+    def __init__(self):
+        self._handlers = []
 
-    def decorator(f):
-        @wraps(f)
-        def wrapper(self, line):
-            m = regex.search(line)
-            if not m:
-                return False
-            result = f(self, *m.groups())
-            if result is not None:
-                return result
-            else:
+    def process(self, owner, line):
+        for h in self._handlers:
+            if h(owner, line):
                 return True
 
-        wrapper.is_handler = True
+    def add(self, regex):
+        if isinstance(regex, str):
+            regex = re.compile(regex)
 
-        return wrapper
+        def decorator(f):
+            @wraps(f)
+            def wrapper(self, line):
+                m = regex.search(line)
+                if not m:
+                    return False
+                result = f(self, *m.groups())
+                if result is not None:
+                    return result
+                else:
+                    return True
 
-    return decorator
+            self._handlers.append(wrapper)
+
+            return wrapper
+
+        return decorator
 
 
 def progress(current, total):
@@ -37,10 +46,9 @@ def progress(current, total):
 class Parser(object):
     TIME_RE = r'(?: \((\d+) ms(?: total)?\))?'
 
-    def __init__(self):
-        members = [getattr(self, i) for i in dir(self)]
-        self.handlers = [f for f in members if callable(f) and hasattr(f, 'is_handler')]
+    handler = LineHandler()
 
+    def __init__(self):
         self.total_test_count = 0
         self.total_test_case_count = 0
         self.test_case_index = 0
@@ -53,21 +61,20 @@ class Parser(object):
         self.in_raw_output = True
 
     def process(self, line):
-        for h in self.handlers:
-            if h(line):
-                self.in_raw_output = False
-                return True
+        if self.handler.process(self, line):
+            self.in_raw_output = False
+            return True
 
         if not self.in_raw_output:
             self.in_raw_output = True
             print()
 
-    @handle(r'Running (\d+) tests? from (\d+) test cases?')
+    @handler.add(r'Running (\d+) tests? from (\d+) test cases?')
     def start(self, total_test_count, total_test_case_count):
         self.total_test_count = int(total_test_count)
         self.total_test_case_count = int(total_test_case_count)
 
-    @handle(r'\[-+\] (\d+) tests? from (.*?)' + TIME_RE + '$')
+    @handler.add(r'\[-+\] (\d+) tests? from (.*?)' + TIME_RE + '$')
     def start_stop_test_case(self, test_count, test_case, time=None):
         if not self.current_test_case:
             self.current_test_case = test_case
@@ -87,16 +94,16 @@ class Parser(object):
                 print()
             self.current_test_case = None
 
-    @handle(r'\[ *RUN *\] (.*)\.(.*)')
+    @handler.add(r'\[ *RUN *\] (.*)\.(.*)')
     def start_test(self, test_case, test_count):
         pass
 
-    @handle(r'\[ *(OK|FAILED) *\] (.*)\.(.*?)' + TIME_RE + '$')
+    @handler.add(r'\[ *(OK|FAILED) *\] (.*)\.(.*?)' + TIME_RE + '$')
     def stop_test(self, status, test_case, test_count, time=None):
         if status == 'FAILED':
             self.current_fail_count += 1
 
-    @handle(r'^$')
+    @handler.add(r'^$')
     def blank_line(self):
         if self.current_test_case:
             return False
