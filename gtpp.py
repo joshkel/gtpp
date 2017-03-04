@@ -78,6 +78,9 @@ class Parser(object):
 
     @handler.add(r'\[-+\] (\d+) tests? from (.*?)(?:, where (.*?))?' + TIME_RE + '$')
     def start_stop_test_case(self, test_count, test_case, where=None, time=None):
+        if time is not None:
+            time = int(time)
+
         self.current_test = None
         if not self.current_test_case:
             self.current_test_case = test_case
@@ -115,8 +118,9 @@ class Parser(object):
 
 
 class ListOutput(object):
-    def __init__(self, characters=UnicodeCharacters):
+    def __init__(self, characters=UnicodeCharacters, print_time=0):
         self.characters = characters
+        self.print_time = print_time
 
         # Internal state
         self.needs_newline = False
@@ -165,7 +169,7 @@ class ListOutput(object):
                             self.characters.fail, Fore.RED,
                             ' - %i/%i failures' % (fail_count, test_count))
 
-        if time:
+        if time is not None and time >= self.print_time:
             print(' (%s ms)' % time)
         else:
             print()
@@ -181,13 +185,16 @@ class ListOutput(object):
 
 def main():
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--ascii', help='Use ASCII progress / status, not Unicode',
-                           action='store_true')
+    argparser.add_argument('--ascii', action='store_true',
+                           help='Use ASCII progress / status, not Unicode')
+    argparser.add_argument('--print_time', type=int, default=100,
+                           help='Only print times greater than N milliseconds')
     args = argparser.parse_args()
 
     output_kwargs = {}
     if args.ascii:
         output_kwargs['characters'] = AsciiCharacters
+    output_kwargs['print_time'] = args.print_time
 
     parser = Parser(ListOutput(**output_kwargs))
 
