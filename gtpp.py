@@ -100,19 +100,33 @@ class Parser(object):
 
 
 class ListOutput(object):
+    def __init__(self):
+        self.needs_newline = False
+
     def progress(self, current, total):
         total = str(total)
         return '%*i / ' % (len(total), current) + total
 
+    def space_for_progress(self, current, total):
+        return ' ' * len(self.progress(current, total))
+
     def raw_output(self, test, line):
+        if self.needs_newline:
+            print()
+            self.needs_newline = False
+
         # Line is already newline-terminated, so use end=''
         print(line, end='')
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
         print(self.progress(test_case_index, total_test_case_count) + '   ' + test_case, end='')
+        self.needs_newline = True
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count, test_count, fail_count, time=None):
-        print('\r' + self.progress(test_case_index, total_test_case_count), end='')
+        if self.needs_newline:
+            print('\r' + self.progress(test_case_index, total_test_case_count), end='')
+        else:
+            print(self.space_for_progress(test_case_index, total_test_case_count), end='')
 
         if not fail_count:
             print(Fore.GREEN + ' ✓ ' + test_case + Style.RESET_ALL, end='')
@@ -123,6 +137,8 @@ class ListOutput(object):
             print(' (%s ms)' % time)
         else:
             print()
+
+        self.needs_newline = False
 
     def start_test(self, test_case, test, test_index, test_count):
         pass
