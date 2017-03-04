@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 
+import argparse
 from colorama import Fore, Style
 from functools import wraps
 import re
 import sys
+
+
+class UnicodeCharacters:
+    success = '✓'
+    fail = '✗'
+
+
+class AsciiCharacters:
+    success = 'OK'
+    fail = ' X'
 
 
 class LineHandler(object):
@@ -104,7 +115,10 @@ class Parser(object):
 
 
 class ListOutput(object):
-    def __init__(self):
+    def __init__(self, characters=UnicodeCharacters):
+        self.characters = characters
+
+        # Internal state
         self.needs_newline = False
 
     def progress(self, current, total):
@@ -113,6 +127,21 @@ class ListOutput(object):
 
     def space_for_progress(self, current, total):
         return ' ' * len(self.progress(current, total))
+
+    def print_line(self, test_case, test_case_index, total_test_case_count, character,
+                   color=None, details=None):
+        if self.needs_newline:
+            print('\r' + self.progress(test_case_index, total_test_case_count), end='')
+        else:
+            print(self.space_for_progress(test_case_index, total_test_case_count), end='')
+
+        if color:
+            print(color, end='')
+        print(' ' + character + ' ' + test_case, end='')
+        if details:
+            print(details)
+        if color:
+            print(Style.RESET_ALL, end='')
 
     def raw_output(self, test, line):
         if self.needs_newline:
@@ -123,21 +152,18 @@ class ListOutput(object):
         print(line, end='')
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
-        print(self.progress(test_case_index, total_test_case_count) + '   ' + test_case, end='')
+        self.print_line(test_case, test_case_index, total_test_case_count, ' ')
         self.needs_newline = True
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
-        if self.needs_newline:
-            print('\r' + self.progress(test_case_index, total_test_case_count), end='')
-        else:
-            print(self.space_for_progress(test_case_index, total_test_case_count), end='')
-
         if not fail_count:
-            print(Fore.GREEN + ' ✓ ' + test_case + Style.RESET_ALL, end='')
+            self.print_line(test_case, test_case_index, total_test_case_count,
+                            self.characters.success, Fore.GREEN)
         else:
-            print(Fore.RED + ' ✗ ' + test_case
-                  + ' - %i/%i failures' % (fail_count, test_count) + Style.RESET_ALL, end='')
+            self.print_line(test_case, test_case_index, total_test_case_count,
+                            self.characters.fail, Fore.RED,
+                            ' - %i/%i failures' % (fail_count, test_count))
 
         if time:
             print(' (%s ms)' % time)
@@ -154,7 +180,16 @@ class ListOutput(object):
 
 
 def main():
-    parser = Parser(ListOutput())
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--ascii', help='Use ASCII progress / status, not Unicode',
+                           action='store_true')
+    args = argparser.parse_args()
+
+    output_kwargs = {}
+    if args.ascii:
+        output_kwargs['characters'] = AsciiCharacters
+
+    parser = Parser(ListOutput(**output_kwargs))
 
     for line in sys.stdin:
         parser.process(line)
