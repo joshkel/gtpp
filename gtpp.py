@@ -8,11 +8,13 @@ import sys
 
 
 class UnicodeCharacters:
+    empty = ' '
     success = '✓'
     fail = '✗'
 
 
 class AsciiCharacters:
+    empty = '  '
     success = 'OK'
     fail = ' X'
 
@@ -114,6 +116,7 @@ class Parser(object):
     @handler.add(r'^$')
     def blank_line(self):
         if self.current_test_case:
+            # Within a test, return False so it's treated as raw output.
             return False
 
 
@@ -133,9 +136,12 @@ class ListOutput(object):
         return ' ' * len(self.progress(current, total))
 
     def print_line(self, test_case, test_case_index, total_test_case_count, character,
-                   color=None, details=None):
+                   color=None, details=None, force_progress=False):
         if self.needs_newline:
-            print('\r' + self.progress(test_case_index, total_test_case_count), end='')
+            print('\r', end='')
+
+        if self.needs_newline or force_progress:
+            print(self.progress(test_case_index, total_test_case_count), end='')
         else:
             print(self.space_for_progress(test_case_index, total_test_case_count), end='')
 
@@ -143,7 +149,7 @@ class ListOutput(object):
             print(color, end='')
         print(' ' + character + ' ' + test_case, end='')
         if details:
-            print(details)
+            print(details, end='')
         if color:
             print(Style.RESET_ALL, end='')
 
@@ -156,7 +162,8 @@ class ListOutput(object):
         print(line, end='')
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
-        self.print_line(test_case, test_case_index, total_test_case_count, ' ')
+        self.print_line(test_case, test_case_index, total_test_case_count, self.characters.empty,
+                        force_progress=True)
         self.needs_newline = True
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
@@ -167,7 +174,7 @@ class ListOutput(object):
         else:
             self.print_line(test_case, test_case_index, total_test_case_count,
                             self.characters.fail, Fore.RED,
-                            ' - %i/%i failures' % (fail_count, test_count))
+                            ' - %i/%i failed' % (fail_count, test_count))
 
         if time is not None and time >= self.print_time:
             print(' (%s ms)' % time)
@@ -183,12 +190,12 @@ class ListOutput(object):
         pass
 
 
-def main():
+def get_output_kwargs():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--ascii', action='store_true',
                            help='Use ASCII progress / status, not Unicode')
     argparser.add_argument('--print_time', type=int, default=100,
-                           help='Only print times greater than N milliseconds')
+                           help='Only print times that are at least N milliseconds')
     args = argparser.parse_args()
 
     output_kwargs = {}
@@ -196,7 +203,11 @@ def main():
         output_kwargs['characters'] = AsciiCharacters
     output_kwargs['print_time'] = args.print_time
 
-    parser = Parser(ListOutput(**output_kwargs))
+    return output_kwargs
+
+
+def main():
+    parser = Parser(ListOutput(**get_output_kwargs()))
 
     for line in sys.stdin:
         parser.process(line)
