@@ -75,9 +75,12 @@ class Parser(object):
             self.test_index = 0
             self.test_case_index += 1
 
-            self.output.start_test_case(test_case, self.test_case_index, self.total_test_case_count, where)
+            self.output.start_test_case(
+                test_case, self.test_case_index, self.total_test_case_count, where)
         else:
-            self.output.stop_test_case(test_case, self.test_case_index, self.total_test_case_count, self.current_test_count, self.current_fail_count, time)
+            self.output.stop_test_case(
+                test_case, self.test_case_index, self.total_test_case_count,
+                self.current_test_count, self.current_fail_count, time)
             self.current_test_case = None
 
     @handler.add(r'\[ *RUN *\] (.*)\.(.*)')
@@ -91,7 +94,8 @@ class Parser(object):
         self.current_test = None
         if status == 'FAILED':
             self.current_fail_count += 1
-        self.output.stop_test(status, test_case, test, self.test_index, self.current_test_count, time)
+        self.output.stop_test(
+            status, test_case, test, self.test_index, self.current_test_count, time)
 
     @handler.add(r'^$')
     def blank_line(self):
@@ -122,7 +126,8 @@ class ListOutput(object):
         print(self.progress(test_case_index, total_test_case_count) + '   ' + test_case, end='')
         self.needs_newline = True
 
-    def stop_test_case(self, test_case, test_case_index, total_test_case_count, test_count, fail_count, time=None):
+    def stop_test_case(self, test_case, test_case_index, total_test_case_count,
+                       test_count, fail_count, time=None):
         if self.needs_newline:
             print('\r' + self.progress(test_case_index, total_test_case_count), end='')
         else:
@@ -131,7 +136,8 @@ class ListOutput(object):
         if not fail_count:
             print(Fore.GREEN + ' ✓ ' + test_case + Style.RESET_ALL, end='')
         else:
-            print(Fore.RED + ' ✗ ' + test_case + ' - %i/%i failures' % (fail_count, test_count) + Style.RESET_ALL, end='')
+            print(Fore.RED + ' ✗ ' + test_case
+                  + ' - %i/%i failures' % (fail_count, test_count) + Style.RESET_ALL, end='')
 
         if time:
             print(' (%s ms)' % time)
