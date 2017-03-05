@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from collections import OrderedDict
 from colorama import Fore, Style
 from functools import wraps
 import re
@@ -169,6 +170,9 @@ class ListOutput(object):
         self.max_line_len = 0
         self.progress_len = 0
 
+        self.current_test_output = []
+        self.failed_test_output = OrderedDict()
+
         # Test progress - provided to start_test_case and stored for use in
         # start_test
         self.test_case_index = None
@@ -231,6 +235,8 @@ class ListOutput(object):
         # Line is already newline-terminated, so use end=''
         print(line, end='')
 
+        self.current_test_output.append(line)
+
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
         self.print_line(test_case, test_case_index, total_test_case_count,
                         self.characters.empty, Fore.BLUE, force_progress=True)
@@ -267,12 +273,15 @@ class ListOutput(object):
         self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
                         self.characters.empty, Fore.BLUE)
 
+        self.current_test_output = []
+
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
         if status == 'FAILED':
             self.print_line(test_case + '.' + test, None, None,
                             self.characters.fail, Fore.RED)
             print()
             self.needs_newline = False
+            self.failed_test_output[test_case + '.' + test] = self.current_test_output
 
     def global_setup(self, total_test_case_count):
         self.total_total_test_case_count = total_test_case_count
@@ -285,6 +294,14 @@ class ListOutput(object):
         self.print_line('Finished', None, None, self.characters.empty, details=self.time_details(time))
         print()
         self.needs_newline = False
+
+        if self.failed_test_output:
+            print()
+            print(Fore.RED + 'FAILED TESTS:' + Style.RESET_ALL)
+            for test_and_case, output in self.failed_test_output.items():
+                print(Fore.RED + self.characters.fail + ' ' + test_and_case + Style.RESET_ALL)
+                for line in output:
+                    print('    ' + line, end='')
 
 
 def get_output_kwargs():
