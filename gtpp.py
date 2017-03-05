@@ -2,6 +2,7 @@
 
 import argparse
 from collections import OrderedDict
+import colorama
 from colorama import Fore, Style
 from functools import wraps
 import re
@@ -267,7 +268,7 @@ class ListOutput(object):
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
         self.print_line(test_case, test_case_index, total_test_case_count,
-                        self.characters.empty, Fore.BLUE, force_progress=True)
+                        self.characters.empty, Fore.CYAN, force_progress=True)
 
         self.test_case_index = test_case_index
         self.total_test_case_count = total_test_case_count
@@ -291,7 +292,7 @@ class ListOutput(object):
         test_case_index, total_test_case_count = self.progress_counts()
 
         self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
-                        self.characters.empty, Fore.BLUE)
+                        self.characters.empty, Fore.CYAN)
 
         self.current_test_output = []
 
@@ -360,6 +361,7 @@ def get_output_kwargs():
 
 
 def main():
+    colorama.init()
     parser = Parser(ListOutput(**get_output_kwargs()))
 
     for line in sys.stdin:
