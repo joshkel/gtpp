@@ -21,6 +21,10 @@ class AsciiCharacters:
     fail = ' X'
 
 
+def plural(text, count):
+    return text if count == 1 else text + 's'
+
+
 class LineHandler(object):
     def __init__(self):
         self._handlers = []
@@ -107,7 +111,7 @@ class Parser(object):
 
     @handler.add(r'YOU HAVE (\d+) DISABLED TESTS?')
     def summary_disabled(self, disabled_test_count):
-        pass
+        self.output.disabled(int(disabled_test_count))
 
     @handler.add(r'\[-+\] (\d+) tests? from (.*?)(?:, where (.*?))?' + TIME_RE + '$')
     def start_stop_test_case(self, test_count, test_case, where=None, time=None):
@@ -251,9 +255,15 @@ class ListOutput(object):
         self.needs_newline = True
 
     def filter(self, filter):
-        # Hack: Duplicate message from native Google Test
+        # Duplicate message from native Google Test
         print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
         self.is_filtered = True
+
+    def disabled(self, disabled_test_count):
+        # Duplicate message from native Google Test
+        message = ('YOU HAVE %i DISABLED %s'
+                   % (disabled_test_count, plural('test', disabled_test_count).upper()))
+        print(Fore.YELLOW + message + Style.RESET_ALL)
 
     def raw_output(self, test, line):
         self.current_test_case_has_output = True
