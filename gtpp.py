@@ -89,7 +89,7 @@ class Parser(object):
 
     @handler.add(r'(\d+) tests? from (\d+) test cases? ran. ?' + TIME_RE + '$')
     def finish(self, total_test_count, total_test_case_count, time):
-        self.output.finish(self.parse_time(time))
+        self.output.finish(int(total_test_count), int(total_test_case_count), self.parse_time(time))
 
     @handler.add(r'\[ *PASSED *\] (\d+) tests?')
     def summary_passed(self, passed_test_count):
@@ -142,7 +142,8 @@ class Parser(object):
         if status == 'FAILED':
             self.current_fail_count += 1
         self.output.stop_test(
-            status, test_case, test, self.test_index, self.current_test_count, self.parse_time(time))
+            status, test_case, test, self.test_index, self.current_test_count,
+            self.parse_time(time))
 
     @handler.add(r'Global test environment set-up')
     def global_setup(self):
@@ -151,6 +152,10 @@ class Parser(object):
     @handler.add(r'Global test environment tear-down')
     def global_teardown(self):
         self.output.global_teardown()
+
+    @handler.add(r'Note: Google Test filter = (.*)')
+    def filter(self, filter):
+        self.output.filter(filter)
 
     @handler.add(r'^$')
     def blank_line(self):
@@ -185,7 +190,14 @@ class ListOutput(object):
     def space_for_progress(self, current, total):
         return ' ' * len(self.progress(current, total))
 
-    def time_details(self, time):
+    def format_failed(self, fail_count, test_count):
+        return ' - %i/%i failed' % (fail_count, test_count)
+
+    def format_passed(self, count):
+        return ' - %i/%i passed' % (count, count)
+
+    def format_time(self, time):
+        """Implementation: Formats a time in msec for display."""
         if time is not None and time >= self.print_time:
             return ' (%s ms)' % time
         else:
@@ -193,6 +205,7 @@ class ListOutput(object):
 
     def print_line(self, test_case, test_case_index, total_test_case_count, character,
                    color=None, details=None, force_progress=False):
+        """Implementation: Prints a line of test / test case progress."""
         if self.needs_newline:
             print('\r', end='')
         else:
@@ -226,6 +239,10 @@ class ListOutput(object):
         print(line, end='')
         self.needs_newline = True
 
+    def filter(self, filter):
+        # Hack: Duplicate message from native Google Test
+        print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
+
     def raw_output(self, test, line):
         self.current_test_case_has_raw = True
         if self.needs_newline:
@@ -247,7 +264,7 @@ class ListOutput(object):
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
-        time_details = self.time_details(time)
+        time_details = self.format_time(time)
         if not fail_count:
             self.print_line(test_case, test_case_index, total_test_case_count,
                             self.characters.success, Fore.GREEN, details=time_details)
@@ -290,8 +307,16 @@ class ListOutput(object):
     def global_teardown(self):
         self.print_line('Teardown', None, None, self.characters.empty)
 
-    def finish(self, time):
-        self.print_line('Finished', None, None, self.characters.empty, details=self.time_details(time))
+    def finish(self, total_test_count, total_test_case_count, time):
+        time_details = self.format_time(time)
+        if not self.failed_test_output:
+            passed_details = self.format_passed(total_test_count)
+            self.print_line('Finished', None, None, self.characters.success, Fore.GREEN,
+                            details=passed_details + time_details)
+        else:
+            failed_details = self.format_failed(len(self.failed_test_output), total_test_count)
+            self.print_line('Finished', None, None, self.characters.fail, Fore.RED,
+                            details=failed_details + time_details)
         print()
         self.needs_newline = False
 
