@@ -171,9 +171,10 @@ class ListOutput(object):
 
         # Internal state
         self.needs_newline = False
-        self.current_test_case_has_raw = False
+        self.current_test_case_has_output = False
         self.max_line_len = 0
         self.progress_len = 0
+        self.is_filtered = False
 
         self.current_test_output = []
         self.failed_test_output = OrderedDict()
@@ -189,6 +190,15 @@ class ListOutput(object):
 
     def space_for_progress(self, current, total):
         return ' ' * len(self.progress(current, total))
+
+    def progress_counts(self):
+        # Print the count if this is still the first line of the test case.
+        # If any raw output (including test failure messages) has occurred,
+        # then it's not.
+        if self.current_test_case_has_output:
+            return None, None
+        else:
+            return self.test_case_index, self.total_test_case_count
 
     def format_failed(self, fail_count, test_count):
         return ' - %i/%i failed' % (fail_count, test_count)
@@ -242,9 +252,10 @@ class ListOutput(object):
     def filter(self, filter):
         # Hack: Duplicate message from native Google Test
         print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
+        self.is_filtered = True
 
     def raw_output(self, test, line):
-        self.current_test_case_has_raw = True
+        self.current_test_case_has_output = True
         if self.needs_newline:
             print()
             self.needs_newline = False
@@ -260,7 +271,7 @@ class ListOutput(object):
 
         self.test_case_index = test_case_index
         self.total_test_case_count = total_test_case_count
-        self.current_test_case_has_raw = False
+        self.current_test_case_has_output = False
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
@@ -277,15 +288,7 @@ class ListOutput(object):
         self.needs_newline = False
 
     def start_test(self, test_case, test, test_index, test_count):
-        # Print the count if this is still the first line of the test case.
-        # If any raw output (including test failure messages) has occurred,
-        # then it's not.
-        if self.current_test_case_has_raw:
-            test_case_index = None
-            total_test_case_count = None
-        else:
-            test_case_index = self.test_case_index
-            total_test_case_count = self.total_test_case_count
+        test_case_index, total_test_case_count = self.progress_counts()
 
         self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
                         self.characters.empty, Fore.BLUE)
@@ -293,12 +296,23 @@ class ListOutput(object):
         self.current_test_output = []
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
+        if status != 'FAILED' and not self.is_filtered:
+            # If filtering is active, be verbose.
+            return
+
+        test_case_index, total_test_case_count = self.progress_counts()
+
         if status == 'FAILED':
-            self.print_line(test_case + '.' + test, None, None,
+            self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
                             self.characters.fail, Fore.RED)
-            print()
-            self.needs_newline = False
             self.failed_test_output[test_case + '.' + test] = self.current_test_output
+        else:
+            self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
+                            self.characters.success, Fore.GREEN)
+
+        print()
+        self.needs_newline = False
+        self.current_test_case_has_output = True
 
     def global_setup(self, total_test_case_count):
         self.total_total_test_case_count = total_test_case_count
