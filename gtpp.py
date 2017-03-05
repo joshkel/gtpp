@@ -188,8 +188,8 @@ class ListOutput(object):
         total = str(total)
         return '%*i / ' % (len(total), current) + total
 
-    def space_for_progress(self, current, total):
-        return ' ' * len(self.progress(current, total))
+    def space_for_progress(self, current, total, char=' '):
+        return char * len(self.progress(current, total))
 
     def progress_counts(self):
         # Print the count if this is still the first line of the test case.
@@ -214,7 +214,7 @@ class ListOutput(object):
             return ''
 
     def print_line(self, test_case, test_case_index, total_test_case_count, character,
-                   color=None, details=None, force_progress=False):
+                   color=None, details=None, force_progress=False, progress_space=' '):
         """Implementation: Prints a line of test / test case progress."""
         if self.needs_newline:
             print('\r', end='')
@@ -224,7 +224,7 @@ class ListOutput(object):
         color_len = 0
 
         if test_case_index is None:
-            line = ' ' * self.progress_len
+            line = progress_space * self.progress_len
         elif self.needs_newline or force_progress:
             line = self.progress(test_case_index, total_test_case_count)
             self.progress_len = len(line)
@@ -326,11 +326,11 @@ class ListOutput(object):
         if not self.failed_test_output:
             passed_details = self.format_passed(total_test_count)
             self.print_line('Finished', None, None, self.characters.success, Fore.GREEN,
-                            details=passed_details + time_details)
+                            details=passed_details + time_details, progress_space='-')
         else:
             failed_details = self.format_failed(len(self.failed_test_output), total_test_count)
             self.print_line('Finished', None, None, self.characters.fail, Fore.RED,
-                            details=failed_details + time_details)
+                            details=failed_details + time_details, progress_space='-')
         print()
         self.needs_newline = False
 
