@@ -127,6 +127,7 @@ class ListOutput(object):
 
         # Internal state
         self.needs_newline = False
+        self.current_test_case_has_raw = False
         self.max_line_len = 0
         self.progress_len = 0
 
@@ -164,11 +165,11 @@ class ListOutput(object):
             line += color
             color_len += len(color)
         line += ' ' + character + ' ' + test_case
-        if details:
-            line += details
         if color:
             line += Style.RESET_ALL
             color_len += len(color)
+        if details:
+            line += details
 
         line_len = len(line) - color_len
         self.max_line_len = max(self.max_line_len, line_len)
@@ -177,6 +178,7 @@ class ListOutput(object):
         print(line, end='')
 
     def raw_output(self, test, line):
+        self.current_test_case_has_raw = True
         if self.needs_newline:
             print()
             self.needs_newline = False
@@ -191,32 +193,44 @@ class ListOutput(object):
 
         self.test_case_index = test_case_index
         self.total_test_case_count = total_test_case_count
+        self.current_test_case_has_raw = False
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
+        time_details = ''
+        if time is not None and time >= self.print_time:
+            time_details = ' (%s ms)' % time
+
         if not fail_count:
             self.print_line(test_case, test_case_index, total_test_case_count,
-                            self.characters.success, Fore.GREEN)
+                            self.characters.success, Fore.GREEN, details=time_details)
         else:
             self.print_line(test_case, test_case_index, total_test_case_count,
                             self.characters.fail, Fore.RED,
-                            ' - %i/%i failed' % (fail_count, test_count))
+                            ' - %i/%i failed%s' % (fail_count, test_count, time_details))
 
-        if time is not None and time >= self.print_time:
-            print(' (%s ms)' % time)
-        else:
-            print()
-
+        print()
         self.needs_newline = False
 
     def start_test(self, test_case, test, test_index, test_count):
-        self.print_line(test_case, self.test_case_index, self.total_test_case_count,
-                        self.characters.empty, Fore.BLUE, details='.' + test)
+        # Print the count if this is still the first line of the test case.
+        # If any raw output (including test failure messages) has occurred,
+        # then it's not.
+        if self.current_test_case_has_raw:
+            test_case_index = None
+            total_test_case_count = None
+        else:
+            test_case_index = self.test_case_index
+            total_test_case_count = self.total_test_case_count
+
+        self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
+                        self.characters.empty, Fore.BLUE)
+        self.needs_newline = True
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
         if status == 'FAILED':
-            self.print_line(test_case, None, None,
-                            self.characters.fail, Fore.RED, details='.' + test)
+            self.print_line(test_case + '.' + test, None, None,
+                            self.characters.fail, Fore.RED)
             print()
             self.needs_newline = False
 
