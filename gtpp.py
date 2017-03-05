@@ -73,15 +73,42 @@ class Parser(object):
         if not self.handler.process(self, line):
             self.output.raw_output(self.current_test, line)
 
+    @staticmethod
+    def parse_time(time):
+        if time is not None:
+            return int(time)
+        else:
+            return None
+
     @handler.add(r'Running (\d+) tests? from (\d+) test cases?')
     def start(self, total_test_count, total_test_case_count):
         self.total_test_count = int(total_test_count)
         self.total_test_case_count = int(total_test_case_count)
+        self.is_summarizing_failures = False
+
+    @handler.add(r'(\d+) tests? from (\d+) test cases? ran. ?' + TIME_RE + '$')
+    def finish(self, total_test_count, total_test_case_count, time):
+        self.output.finish(self.parse_time(time))
+
+    @handler.add(r'\[ *PASSED *\] (\d+) tests?')
+    def summary_passed(self, passed_test_count):
+        pass
+
+    @handler.add(r'\[ *FAILED *\] (\d+) tests?, listed below')
+    def summary_failed1(self, failed_test_count):
+        self.is_summarizing_failures = True
+        pass
+
+    @handler.add(r'(\d+) FAILED TESTS?')
+    def summary_failed2(self, failed_test_count):
+        pass
+
+    @handler.add(r'YOU HAVE (\d+) DISABLED TESTS?')
+    def summary_disabled(self, disabled_test_count):
+        pass
 
     @handler.add(r'\[-+\] (\d+) tests? from (.*?)(?:, where (.*?))?' + TIME_RE + '$')
     def start_stop_test_case(self, test_count, test_case, where=None, time=None):
-        if time is not None:
-            time = int(time)
 
         self.current_test = None
         if not self.current_test_case:
@@ -96,7 +123,7 @@ class Parser(object):
         else:
             self.output.stop_test_case(
                 test_case, self.test_case_index, self.total_test_case_count,
-                self.current_test_count, self.current_fail_count, time)
+                self.current_test_count, self.current_fail_count, self.parse_time(time))
             self.current_test_case = None
 
     @handler.add(r'\[ *RUN *\] (.*)\.(.*)')
@@ -107,11 +134,14 @@ class Parser(object):
 
     @handler.add(r'\[ *(OK|FAILED) *\] (.*)\.(.*?)' + TIME_RE + '$')
     def stop_test(self, status, test_case, test, time=None):
+        if self.is_summarizing_failures:
+            return
+
         self.current_test = None
         if status == 'FAILED':
             self.current_fail_count += 1
         self.output.stop_test(
-            status, test_case, test, self.test_index, self.current_test_count, time)
+            status, test_case, test, self.test_index, self.current_test_count, self.parse_time(time))
 
     @handler.add(r'Global test environment set-up')
     def global_setup(self):
@@ -150,6 +180,12 @@ class ListOutput(object):
 
     def space_for_progress(self, current, total):
         return ' ' * len(self.progress(current, total))
+
+    def time_details(self, time):
+        if time is not None and time >= self.print_time:
+            return ' (%s ms)' % time
+        else:
+            return ''
 
     def print_line(self, test_case, test_case_index, total_test_case_count, character,
                    color=None, details=None, force_progress=False):
@@ -205,10 +241,7 @@ class ListOutput(object):
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
-        time_details = ''
-        if time is not None and time >= self.print_time:
-            time_details = ' (%s ms)' % time
-
+        time_details = self.time_details(time)
         if not fail_count:
             self.print_line(test_case, test_case_index, total_test_case_count,
                             self.characters.success, Fore.GREEN, details=time_details)
@@ -247,6 +280,11 @@ class ListOutput(object):
 
     def global_teardown(self):
         self.print_line('Teardown', None, None, self.characters.empty)
+
+    def finish(self, time):
+        self.print_line('Finished', None, None, self.characters.empty, details=self.time_details(time))
+        print()
+        self.needs_newline = False
 
 
 def get_output_kwargs():
