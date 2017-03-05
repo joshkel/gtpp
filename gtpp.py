@@ -113,6 +113,14 @@ class Parser(object):
         self.output.stop_test(
             status, test_case, test, self.test_index, self.current_test_count, time)
 
+    @handler.add(r'Global test environment set-up')
+    def global_setup(self):
+        self.output.global_setup(self.total_test_case_count)
+
+    @handler.add(r'Global test environment tear-down')
+    def global_teardown(self):
+        self.output.global_teardown()
+
     @handler.add(r'^$')
     def blank_line(self):
         if self.current_test_case:
@@ -176,6 +184,7 @@ class ListOutput(object):
         line += ' ' * (self.max_line_len - line_len)
 
         print(line, end='')
+        self.needs_newline = True
 
     def raw_output(self, test, line):
         self.current_test_case_has_raw = True
@@ -189,7 +198,6 @@ class ListOutput(object):
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
         self.print_line(test_case, test_case_index, total_test_case_count,
                         self.characters.empty, Fore.BLUE, force_progress=True)
-        self.needs_newline = True
 
         self.test_case_index = test_case_index
         self.total_test_case_count = total_test_case_count
@@ -225,7 +233,6 @@ class ListOutput(object):
 
         self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
                         self.characters.empty, Fore.BLUE)
-        self.needs_newline = True
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
         if status == 'FAILED':
@@ -233,6 +240,13 @@ class ListOutput(object):
                             self.characters.fail, Fore.RED)
             print()
             self.needs_newline = False
+
+    def global_setup(self, total_test_case_count):
+        self.total_total_test_case_count = total_test_case_count
+        self.print_line('Setup', None, None, self.characters.empty)
+
+    def global_teardown(self):
+        self.print_line('Teardown', None, None, self.characters.empty)
 
 
 def get_output_kwargs():
