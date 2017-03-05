@@ -127,6 +127,13 @@ class ListOutput(object):
 
         # Internal state
         self.needs_newline = False
+        self.max_line_len = 0
+        self.progress_len = 0
+
+        # Test progress - provided to start_test_case and stored for use in
+        # start_test
+        self.test_case_index = None
+        self.total_test_case_count = None
 
     def progress(self, current, total):
         total = str(total)
@@ -139,19 +146,35 @@ class ListOutput(object):
                    color=None, details=None, force_progress=False):
         if self.needs_newline:
             print('\r', end='')
-
-        if self.needs_newline or force_progress:
-            print(self.progress(test_case_index, total_test_case_count), end='')
         else:
-            print(self.space_for_progress(test_case_index, total_test_case_count), end='')
+            self.max_line_len = 0
+
+        color_len = 0
+
+        if test_case_index is None:
+            line = ' ' * self.progress_len
+        elif self.needs_newline or force_progress:
+            line = self.progress(test_case_index, total_test_case_count)
+            self.progress_len = len(line)
+        else:
+            line = self.space_for_progress(test_case_index, total_test_case_count)
+            self.progress_len = len(line)
 
         if color:
-            print(color, end='')
-        print(' ' + character + ' ' + test_case, end='')
+            line += color
+            color_len += len(color)
+        line += ' ' + character + ' ' + test_case
         if details:
-            print(details, end='')
+            line += details
         if color:
-            print(Style.RESET_ALL, end='')
+            line += Style.RESET_ALL
+            color_len += len(color)
+
+        line_len = len(line) - color_len
+        self.max_line_len = max(self.max_line_len, line_len)
+        line += ' ' * (self.max_line_len - line_len)
+
+        print(line, end='')
 
     def raw_output(self, test, line):
         if self.needs_newline:
@@ -162,9 +185,12 @@ class ListOutput(object):
         print(line, end='')
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
-        self.print_line(test_case, test_case_index, total_test_case_count, self.characters.empty,
-                        force_progress=True)
+        self.print_line(test_case, test_case_index, total_test_case_count,
+                        self.characters.empty, Fore.BLUE, force_progress=True)
         self.needs_newline = True
+
+        self.test_case_index = test_case_index
+        self.total_test_case_count = total_test_case_count
 
     def stop_test_case(self, test_case, test_case_index, total_test_case_count,
                        test_count, fail_count, time=None):
@@ -184,10 +210,15 @@ class ListOutput(object):
         self.needs_newline = False
 
     def start_test(self, test_case, test, test_index, test_count):
-        pass
+        self.print_line(test_case, self.test_case_index, self.total_test_case_count,
+                        self.characters.empty, Fore.BLUE, details='.' + test)
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
-        pass
+        if status == 'FAILED':
+            self.print_line(test_case, None, None,
+                            self.characters.fail, Fore.RED, details='.' + test)
+            print()
+            self.needs_newline = False
 
 
 def get_output_kwargs():
