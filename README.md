@@ -58,7 +58,7 @@ to use.
 3. Whenever you run your unit tests, pipe the results through `gtpp`.  For example:
 
     ```
-    make test | path/to/gtpp.py
+    make test |& path/to/gtpp.py
     ```
 
 ## Why Python?

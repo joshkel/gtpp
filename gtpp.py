@@ -75,6 +75,10 @@ class Parser(object):
         self.test_index = 0
         self.current_fail_count = 0
 
+        # Public properties
+        self.in_test_suite = False
+        self.has_failures = False    # Has any test ever failed?
+
     def process(self, line):
         if not self.handler.process(self, line):
             self.output.raw_output(self.current_test, line)
@@ -90,11 +94,13 @@ class Parser(object):
     def start(self, total_test_count, total_test_case_count):
         self.total_test_count = int(total_test_count)
         self.total_test_case_count = int(total_test_case_count)
+        self.in_test_suite = True
         self.is_summarizing_failures = False
 
     @handler.add(r'(\d+) tests? from (\d+) test cases? ran. ?' + TIME_RE + '$')
     def finish(self, total_test_count, total_test_case_count, time):
         self.output.finish(int(total_test_count), int(total_test_case_count), self.parse_time(time))
+        self.in_test_suite = False
 
     @handler.add(r'\[ *PASSED *\] (\d+) tests?')
     def summary_passed(self, passed_test_count):
@@ -115,7 +121,6 @@ class Parser(object):
 
     @handler.add(r'\[-+\] (\d+) tests? from (.*?)(?:, where (.*?))?' + TIME_RE + '$')
     def start_stop_test_case(self, test_count, test_case, where=None, time=None):
-
         self.current_test = None
         if not self.current_test_case:
             self.current_test_case = test_case
@@ -146,6 +151,7 @@ class Parser(object):
         self.current_test = None
         if status == 'FAILED':
             self.current_fail_count += 1
+            self.has_failures = True
         self.output.stop_test(
             status, test_case, test, self.test_index, self.current_test_count,
             self.parse_time(time))
@@ -209,7 +215,7 @@ class ListOutput(object):
         return ' - %i/%i failed' % (fail_count, test_count)
 
     def format_passed(self, count):
-        return ' - %i/%i passed' % (count, count)
+        return ' - %i/%i tests passed' % (count, count)
 
     def format_time(self, time):
         """Implementation: Formats a time in msec for display."""
@@ -377,6 +383,13 @@ def main():
     for line in sys.stdin:
         parser.process(line)
 
+    if parser.in_test_suite:
+        print(Fore.RED + 'Test suite aborted' + Style.RESET_ALL)
+        sys.exit(1)
+    elif parser.has_failures:
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
+
