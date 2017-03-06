@@ -1,3 +1,74 @@
 # Google Test Pretty Printer
 
-A pretty printer / test listener for [Google Test](https://github.com/google/googletest).
+`gtpp` (Google Test Pretty Printer) is a pretty printer / test listener for
+[Google Test](https://github.com/google/googletest).
+
+Google Test is a great testing framework for C++. It has lots of powerful
+features, good popularity, a fully functional mocking library that works with
+it…
+
+Google Test is *loud*. Here's what its output looks like by default.
+
+![](googletest.gif)
+
+`gtpp` makes it much more pleasant to use.  Here's the same test suite, run through `gtpp`.
+
+![](gtpp.gif)
+
+## Usage
+
+1. Clone the repository.
+
+    ```
+    git clone https://github.com/joshkel/gtpp.git
+    ```
+
+2. Install prerequisites.  For example, on Ubuntu:
+
+    ```
+    sudo apt-get install python3-colorama
+    ```
+
+    Or set up a virtualenv.
+
+    ```
+    cd gtpp
+    python3 -m venv env
+    . env/bin/activate
+    pip install -r requirements.txt
+    ```
+
+3. Whenever you run your unit tests, pipe the results through `gtpp`.  For example:
+
+    ```
+    make test | path/to/gtpp.py
+    ```
+
+## Features
+
+* Quieter output - By default, Google Test prints 2 lines of output per
+  individual test, plus 3 lines for every test case.  `gtpp` prints one line
+  per test case under normal operation, without sacrificing any detail if
+  individual tests fail or need more detailed output.
+* Automatic verbosity - If test filtering is enabled, because you're trying to
+  zero in on particular problems, `gtpp` automatically switches to more verbose
+  output.
+* Details of test failures - The list of failed tests at the end now includes
+  actual and expected values, instead of forcing you to scroll back up to find
+  details on what went wrong.
+* Smart time output - Google Test prints how long each test takes.  `gtpp`
+  enhances this to only print interesting test cases' times (over 100 ms by
+  default, configurable with `--print-time=N`), to help you focus on slow
+  tests.
+* Unicode output - because every test runner needs ✓ and ✗.  You can use the
+  `--ascii` option to switch back to plain ASCII if your terminal doesn't
+  support these characters.
+
+## Why Python?
+
+Google Test provides its own [Event Listener
+API](https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#extending-google-test-by-handling-test-events),
+so why write an external program?  Partly for flexibility - this allows _any_
+Google Test suite to work, without source modifications - and partly for power
+- because the external program sees all of the output, it can add features like
+including failing tests' full output at the end of the run.
