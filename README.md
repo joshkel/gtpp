@@ -7,42 +7,9 @@ Google Test is a great testing framework for C++. It has lots of powerful
 features, good popularity, a fully functional mocking library that works with
 it…
 
-Google Test is *loud*. Here's what its output looks like by default.
-
-![](googletest.gif)
-
-`gtpp` makes it much more pleasant to use.  Here's the same test suite, run through `gtpp`.
-
-![](gtpp.gif)
-
-## Usage
-
-1. Clone the repository.
-
-    ```
-    git clone https://github.com/joshkel/gtpp.git
-    ```
-
-2. Install prerequisites.  For example, on Ubuntu:
-
-    ```
-    sudo apt-get install python3-colorama
-    ```
-
-    Or set up a virtualenv.
-
-    ```
-    cd gtpp
-    python3 -m venv env
-    . env/bin/activate
-    pip install -r requirements.txt
-    ```
-
-3. Whenever you run your unit tests, pipe the results through `gtpp`.  For example:
-
-    ```
-    make test | path/to/gtpp.py
-    ```
+There's one problem. Google Test is *loud*.  `gtpp` makes it much more pleasant
+to use. Take a look at these [screenshots](screenshots.md) for an example.  by
+default.
 
 ## Features
 
@@ -63,6 +30,35 @@ Google Test is *loud*. Here's what its output looks like by default.
 * Unicode output - because every test runner needs ✓ and ✗.  You can use the
   `--ascii` option to switch back to plain ASCII if your terminal doesn't
   support these characters.
+
+## Usage
+
+1. Clone the repository.
+
+    ```
+    git clone https://github.com/joshkel/gtpp.git
+    ```
+
+2. Install prerequisites.  For example, on Ubuntu:
+
+    ```
+    sudo apt-get install python3-colorama
+    ```
+
+    Or set up a virtualenv and install prerequisites there.
+
+    ```
+    cd gtpp
+    python3 -m venv env
+    . env/bin/activate
+    pip install -r requirements.txt
+    ```
+
+3. Whenever you run your unit tests, pipe the results through `gtpp`.  For example:
+
+    ```
+    make test | path/to/gtpp.py
+    ```
 
 ## Why Python?
 
