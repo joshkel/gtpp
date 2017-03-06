@@ -8,8 +8,9 @@ features, good popularity, a fully functional mocking library that works with
 it…
 
 There's one problem. Google Test is *loud*.  `gtpp` makes it much more pleasant
-to use. Take a look at these [screenshots](screenshots.md) for an example.  by
-default.
+to use.
+
+[See these screenshots for an example.](screenshots.md)
 
 ## Features
 
