@@ -211,11 +211,17 @@ class ListOutput(object):
         else:
             return self.test_case_index, self.total_test_case_count
 
-    def format_failed(self, fail_count, test_count):
-        return ' - %i/%i failed' % (fail_count, test_count)
+    def format_failed(self, fail_count, test_count, test_case_count):
+        tests = plural('test', test_count)
+        test_cases = plural('test case', test_case_count)
+        return (' - %i/%i %s from %i %s failed'
+                % (fail_count, test_count, tests, test_case_count, test_cases))
 
-    def format_passed(self, count):
-        return ' - %i/%i tests passed' % (count, count)
+    def format_passed(self, test_count, test_case_count):
+        tests = plural('test', test_count)
+        test_cases = plural('test case', test_case_count)
+        return (' - %i/%i %s from %i %s passed'
+                % (test_count, test_count, tests, test_case_count, test_cases))
 
     def format_time(self, time):
         """Implementation: Formats a time in msec for display."""
@@ -341,11 +347,12 @@ class ListOutput(object):
     def finish(self, total_test_count, total_test_case_count, time):
         time_details = self.format_time(time)
         if not self.failed_test_output:
-            passed_details = self.format_passed(total_test_count)
+            passed_details = self.format_passed(total_test_count, total_test_case_count)
             self.print_line('Finished', None, None, self.characters.success, Fore.GREEN,
                             details=passed_details + time_details, progress_space='-')
         else:
-            failed_details = self.format_failed(len(self.failed_test_output), total_test_count)
+            failed_details = self.format_failed(
+                len(self.failed_test_output), total_test_count, total_test_case_count)
             self.print_line('Finished', None, None, self.characters.fail, Fore.RED,
                             details=failed_details + time_details, progress_space='-')
         print()
