@@ -21,12 +21,12 @@ to use.
 * Automatic verbosity - If test filtering is enabled, because you're trying to
   zero in on particular problems, `gtpp` automatically switches to more verbose
   output.
-* Details of test failures - The list of failed tests at the end now includes
-  actual and expected values, instead of forcing you to scroll back up to find
-  details on what went wrong.
+* Details of test failures - The list of failed tests at the end includes
+  actual actual and expected values, instead of forcing you to scroll back up
+  to find details on what went wrong.
 * Smart time output - Google Test prints how long each test takes.  `gtpp`
-  enhances this to only print interesting test cases' times (over 100 ms by
-  default, configurable with `--print-time=N`), to help you focus on slow
+  enhances this to only print interesting test cases' times (over 50 ms by
+  default; configurable with `--print-time=N`), to help you focus on slow
   tests.
 * Unicode output - because every test runner needs ✓ and ✗.  You can use the
   `--ascii` option to switch back to plain ASCII if your terminal doesn't
@@ -66,6 +66,6 @@ to use.
 Google Test provides its own [Event Listener
 API](https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#extending-google-test-by-handling-test-events),
 so why write an external program?  Partly for flexibility - this allows _any_
-Google Test suite to work, without source modifications - and partly for power
-- because the external program sees all of the output, it can add features like
-including failing tests' full output at the end of the run.
+test suite that uses Google Test to work, without source modifications - and
+partly for power - because the external program sees all of the output, it can
+add features like including failing tests' full output at the end of the run.

@@ -358,7 +358,7 @@ def get_output_kwargs():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--ascii', action='store_true',
                            help='Use ASCII progress / status, not Unicode')
-    argparser.add_argument('--print_time', type=int, default=100,
+    argparser.add_argument('--print_time', type=int, default=50,
                            help='Only print times that are at least N milliseconds')
     args = argparser.parse_args()
 
