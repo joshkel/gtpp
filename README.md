@@ -10,7 +10,7 @@ it…
 There's one problem. Google Test is *loud*.  `gtpp` makes it much more pleasant
 to use.
 
-[See these screenshots for an example.](screenshots.md)
+[See these screenshots for an example.](docs/screenshots.md)
 
 ## Features
 
