@@ -26,6 +26,8 @@ def plural(text, count):
 
 
 class LineHandler(object):
+    """Offers decorators for setting up regex-based parsing of line input."""
+
     def __init__(self):
         self._handlers = []
 
@@ -58,6 +60,11 @@ class LineHandler(object):
 
 
 class Parser(object):
+    """Parses Google Test output.
+
+    Parsed output is used to generate test events, which are dispatched to our
+    own Output class."""
+
     TIME_RE = r'(?: \((\d+) ms(?: total)?\))?'
 
     handler = LineHandler()
@@ -175,15 +182,53 @@ class Parser(object):
             return False
 
 
+class LinePrinter(object):
+    def __init__(self):
+        self.max_line_len = 0
+        self.needs_newline = False
+
+    def print_noeol(self, line):
+        if self.needs_newline:
+            print('\r', end='')
+        else:
+            self.max_line_len = 0
+
+        line_no_ansi = re.sub('\x1b\\[\\d+m', '', line)
+        line_len = len(line_no_ansi)
+        self.max_line_len = max(line_len, self.max_line_len)
+        line = line + ' ' * (self.max_line_len - line_len)
+
+        print(line, end='')
+        self.needs_newline = True
+
+    def print(self, line=''):
+        if self.needs_newline:
+            self.newline()
+
+        # Our lines are piped from Google Test and typically have their own
+        # newline.  To allow both those and normal Python usage, remove any
+        # newlines then add our own.
+        print(line.rstrip('\n'))
+
+    def newline(self):
+        print()
+        self.max_line_len = 0
+        self.needs_newline = False
+
+
 class ListOutput(object):
+    """Standard test output.
+
+    Lists test cases, with more detail for failed tests."""
+
     def __init__(self, characters=UnicodeCharacters, print_time=0):
         self.characters = characters
         self.print_time = print_time
 
+        self.printer = LinePrinter()
+
         # Internal state
-        self.needs_newline = False
         self.current_test_case_has_output = False
-        self.max_line_len = 0
         self.progress_len = 0
         self.is_filtered = False
 
@@ -230,19 +275,12 @@ class ListOutput(object):
         else:
             return ''
 
-    def print_line(self, test_case, test_case_index, total_test_case_count, character,
-                   color=None, details=None, force_progress=False, progress_space=' '):
+    def print_status(self, test_case, test_case_index, total_test_case_count, character,
+                     color=None, details=None, force_progress=False, progress_space=' '):
         """Implementation: Prints a line of test / test case progress."""
-        if self.needs_newline:
-            print('\r', end='')
-        else:
-            self.max_line_len = 0
-
-        color_len = 0
-
         if test_case_index is None:
             line = progress_space * self.progress_len
-        elif self.needs_newline or force_progress:
+        elif self.printer.needs_newline or force_progress:
             line = self.progress(test_case_index, total_test_case_count)
             self.progress_len = len(line)
         else:
@@ -251,46 +289,33 @@ class ListOutput(object):
 
         if color:
             line += color
-            color_len += len(color)
         line += ' ' + character + ' ' + test_case
         if color:
             line += Style.RESET_ALL
-            color_len += len(color)
         if details:
             line += details
 
-        line_len = len(line) - color_len
-        self.max_line_len = max(self.max_line_len, line_len)
-        line += ' ' * (self.max_line_len - line_len)
-
-        print(line, end='')
-        self.needs_newline = True
+        self.printer.print_noeol(line)
 
     def filter(self, filter):
         # Duplicate message from native Google Test
-        print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
+        self.printer.print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
         self.is_filtered = True
 
     def disabled(self, disabled_test_count):
         # Duplicate message from native Google Test
         message = ('YOU HAVE %i DISABLED %s'
                    % (disabled_test_count, plural('test', disabled_test_count).upper()))
-        print(Fore.YELLOW + message + Style.RESET_ALL)
+        self.printer.print(Fore.YELLOW + message + Style.RESET_ALL)
 
     def raw_output(self, test, line):
         self.current_test_case_has_output = True
-        if self.needs_newline:
-            print()
-            self.needs_newline = False
-
-        # Line is already newline-terminated, so use end=''
-        print(line, end='')
-
+        self.printer.print(line)
         self.current_test_output.append(line)
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
-        self.print_line(test_case, test_case_index, total_test_case_count,
-                        self.characters.empty, Fore.CYAN, force_progress=True)
+        self.print_status(test_case, test_case_index, total_test_case_count,
+                          self.characters.empty, Fore.CYAN, force_progress=True)
 
         self.test_case_index = test_case_index
         self.total_test_case_count = total_test_case_count
@@ -300,12 +325,12 @@ class ListOutput(object):
                        test_count, fail_count, time=None):
         time_details = self.format_time(time)
         if not fail_count:
-            self.print_line(test_case, test_case_index, total_test_case_count,
-                            self.characters.success, Fore.GREEN, details=time_details)
+            self.print_status(test_case, test_case_index, total_test_case_count,
+                              self.characters.success, Fore.GREEN, details=time_details)
         else:
-            self.print_line(test_case, test_case_index, total_test_case_count,
-                            self.characters.fail, Fore.RED,
-                            ' - %i/%i failed%s' % (fail_count, test_count, time_details))
+            self.print_status(test_case, test_case_index, total_test_case_count,
+                              self.characters.fail, Fore.RED,
+                              ' - %i/%i failed%s' % (fail_count, test_count, time_details))
 
         print()
         self.needs_newline = False
@@ -313,8 +338,8 @@ class ListOutput(object):
     def start_test(self, test_case, test, test_index, test_count):
         test_case_index, total_test_case_count = self.progress_counts()
 
-        self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
-                        self.characters.empty, Fore.CYAN)
+        self.print_status(test_case + '.' + test, test_case_index, total_test_case_count,
+                          self.characters.empty, Fore.CYAN)
 
         self.current_test_output = []
 
@@ -326,45 +351,44 @@ class ListOutput(object):
         test_case_index, total_test_case_count = self.progress_counts()
 
         if status == 'FAILED':
-            self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
-                            self.characters.fail, Fore.RED)
+            self.print_status(test_case + '.' + test, test_case_index, total_test_case_count,
+                              self.characters.fail, Fore.RED)
             self.failed_test_output[test_case + '.' + test] = self.current_test_output
         else:
-            self.print_line(test_case + '.' + test, test_case_index, total_test_case_count,
-                            self.characters.success, Fore.GREEN)
+            self.print_status(test_case + '.' + test, test_case_index, total_test_case_count,
+                              self.characters.success, Fore.GREEN)
 
-        print()
-        self.needs_newline = False
+        self.printer.newline()
         self.current_test_case_has_output = True
 
     def global_setup(self, total_test_case_count):
         self.total_total_test_case_count = total_test_case_count
-        self.print_line('Setup', None, None, self.characters.empty)
+        self.print_status('Setup', None, None, self.characters.empty)
 
     def global_teardown(self):
-        self.print_line('Teardown', None, None, self.characters.empty)
+        self.print_status('Teardown', None, None, self.characters.empty)
 
     def finish(self, total_test_count, total_test_case_count, time):
         time_details = self.format_time(time)
         if not self.failed_test_output:
             passed_details = self.format_passed(total_test_count, total_test_case_count)
-            self.print_line('Finished', None, None, self.characters.success, Fore.GREEN,
-                            details=passed_details + time_details, progress_space='-')
+            self.print_status('Finished', None, None, self.characters.success, Fore.GREEN,
+                              details=passed_details + time_details, progress_space='-')
         else:
             failed_details = self.format_failed(
                 len(self.failed_test_output), total_test_count, total_test_case_count)
-            self.print_line('Finished', None, None, self.characters.fail, Fore.RED,
-                            details=failed_details + time_details, progress_space='-')
-        print()
-        self.needs_newline = False
+            self.print_status('Finished', None, None, self.characters.fail, Fore.RED,
+                              details=failed_details + time_details, progress_space='-')
+        self.printer.newline()
 
         if self.failed_test_output:
-            print()
-            print(Fore.RED + 'FAILED TESTS:' + Style.RESET_ALL)
+            self.printer.print()
+            self.printer.print(Fore.RED + 'FAILED TESTS:' + Style.RESET_ALL)
             for test_and_case, output in self.failed_test_output.items():
-                print(Fore.RED + self.characters.fail + ' ' + test_and_case + Style.RESET_ALL)
+                self.printer.print(
+                    Fore.RED + self.characters.fail + ' ' + test_and_case + Style.RESET_ALL)
                 for line in output:
-                    print('    ' + line, end='')
+                    self.printer.print('    ' + line)
 
 
 def get_output_kwargs():
@@ -399,4 +423,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
