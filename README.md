@@ -18,6 +18,8 @@ to use.
   individual test, plus 3 lines for every test case.  `gtpp` prints one line
   per test case under normal operation, without sacrificing any detail if
   individual tests fail or need more detailed output.
+* If even that's more verbose than you'd like, then use `--failures-only`, and
+  only failing tests (or any test with actual output) will be left on the screen.
 * Automatic verbosity - If test filtering is enabled, because you're trying to
   zero in on particular problems, `gtpp` automatically switches to more verbose
   output.

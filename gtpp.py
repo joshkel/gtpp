@@ -165,7 +165,7 @@ class Parser(object):
 
     @handler.add(r'Global test environment set-up')
     def global_setup(self):
-        self.output.global_setup(self.total_test_case_count)
+        self.output.global_setup(self.total_test_count, self.total_test_case_count)
 
     @handler.add(r'Global test environment tear-down')
     def global_teardown(self):
@@ -184,22 +184,23 @@ class Parser(object):
 
 class LinePrinter(object):
     def __init__(self):
-        self.max_line_len = 0
+        self.prev_line_len = 0
         self.needs_newline = False
 
     def print_noeol(self, line):
         if self.needs_newline:
             print('\r', end='')
         else:
-            self.max_line_len = 0
+            self.prev_line_len = 0
 
         line_no_ansi = re.sub('\x1b\\[\\d+m', '', line)
         line_len = len(line_no_ansi)
-        self.max_line_len = max(line_len, self.max_line_len)
-        line = line + ' ' * (self.max_line_len - line_len)
+        if self.prev_line_len > line_len:
+            line = line + ' ' * (self.prev_line_len - line_len)
 
         print(line, end='')
         self.needs_newline = True
+        self.prev_line_len = line_len
 
     def print(self, line=''):
         if self.needs_newline:
@@ -212,7 +213,7 @@ class LinePrinter(object):
 
     def newline(self):
         print()
-        self.max_line_len = 0
+        self.prev_line_len = 0
         self.needs_newline = False
 
 
@@ -229,14 +230,14 @@ class BaseOutput(object):
         """Helper method: Formats final results if there are any failures."""
         tests = plural('test', test_count)
         test_cases = plural('test case', test_case_count)
-        return (' - %i/%i %s from %i %s failed'
+        return ('%i/%i %s from %i %s failed'
                 % (fail_count, test_count, tests, test_case_count, test_cases))
 
     def format_passed(self, test_count, test_case_count):
         """Helper method: Formats final results if everything passed."""
         tests = plural('test', test_count)
         test_cases = plural('test case', test_case_count)
-        return (' - %i/%i %s from %i %s passed'
+        return ('%i/%i %s from %i %s passed'
                 % (test_count, test_count, tests, test_case_count, test_cases))
 
     def format_time(self, time):
@@ -274,7 +275,7 @@ class BaseOutput(object):
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
         raise NotImplementedError
 
-    def global_setup(self, total_test_case_count):
+    def global_setup(self, total_test_count, total_test_case_count):
         raise NotImplementedError
 
     def global_teardown(self):
@@ -394,7 +395,7 @@ class ListOutput(BaseOutput):
         self.printer.newline()
         self.current_test_case_has_output = True
 
-    def global_setup(self, total_test_case_count):
+    def global_setup(self, total_test_count, total_test_case_count):
         self.total_total_test_case_count = total_test_case_count
         self.print_status('Setup', None, None, self.characters.empty)
 
@@ -404,11 +405,11 @@ class ListOutput(BaseOutput):
     def finish(self, total_test_count, total_test_case_count, time):
         time_details = self.format_time(time)
         if not self.failed_test_output:
-            passed_details = self.format_passed(total_test_count, total_test_case_count)
+            passed_details = ' - ' + self.format_passed(total_test_count, total_test_case_count)
             self.print_status('Finished', None, None, self.characters.success, Fore.GREEN,
                               details=passed_details + time_details, progress_space='-')
         else:
-            failed_details = self.format_failed(
+            failed_details = ' - ' + self.format_failed(
                 len(self.failed_test_output), total_test_count, total_test_case_count)
             self.print_status('Finished', None, None, self.characters.fail, Fore.RED,
                               details=failed_details + time_details, progress_space='-')
@@ -424,25 +425,104 @@ class ListOutput(BaseOutput):
                     self.printer.print('    ' + line)
 
 
-def get_output_kwargs():
+class FailuresOnlyOutput(BaseOutput):
+    PERCENT_WIDTH = 6
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.current_test_has_output = False
+
+    def format_percent(self):
+        return '%5.1f%%' % (self.total_test_index / self.total_test_count * 100)
+
+    def print_status(self, test_and_case, character=None, color=Fore.CYAN, include_percent=True):
+        assert(character or include_percent)
+        if include_percent:
+            line = self.format_percent() + ' ' + color
+        else:
+            line = ' ' * 5 + color + character + ' '
+
+        line = line + ' ' + test_and_case + Style.RESET_ALL
+        self.printer.print_noeol(line)
+
+    def raw_output(self, test, line):
+        self.printer.print(' ' * 8 + line)
+        self.current_test_has_output = True
+
+    def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
+
+        pass
+
+    def stop_test_case(self, test_case, test_case_index, total_test_case_count,
+                       test_count, fail_count, time=None):
+        pass
+
+    def start_test(self, test_case, test, test_index, test_count):
+        self.total_test_index += 1
+        self.print_status(test_case + '.' + test)
+
+    def stop_test(self, status, test_case, test, test_index, test_count, time=None):
+        if self.current_test_has_output or status == 'FAILED':
+            if status == 'FAILED':
+                self.failed_test_count += 1
+                self.print_status(test_case + '.' + test,
+                                  self.characters.fail, Fore.RED, False)
+            else:
+                self.print_status(test_case + '.' + test,
+                                  self.characters.success, Fore.GREEN, False)
+            self.printer.newline()
+        self.current_test_has_output = False
+
+    def global_setup(self, total_test_count, total_test_case_count):
+        self.total_test_count = total_test_count
+        self.total_test_index = 0
+        self.failed_test_count = 0
+        self.print_status('Setup')
+
+    def global_teardown(self):
+        self.print_status('Teardown')
+
+    def finish(self, total_test_count, total_test_case_count, time):
+        time_details = self.format_time(time)
+        if not self.failed_test_count:
+            status_details = self.format_passed(total_test_count, total_test_case_count)
+            color = Fore.GREEN
+            character = self.characters.success
+        else:
+            status_details = self.format_failed(
+                self.failed_test_count, total_test_count, total_test_case_count)
+            color = Fore.RED
+            character = self.characters.fail
+        self.printer.print(
+            color + character + ' ' + status_details + Style.RESET_ALL + time_details)
+
+
+def make_output():
     argparser = argparse.ArgumentParser()
+    argparser.add_argument('--failures-only', action='store_true',
+                           help='Only failed tests (and other test output) are left on screen')
     argparser.add_argument('--ascii', action='store_true',
                            help='Use ASCII progress / status, not Unicode')
-    argparser.add_argument('--print_time', type=int, default=50,
+    argparser.add_argument('--print-time', type=int, default=50,
                            help='Only print times that are at least N milliseconds')
     args = argparser.parse_args()
 
-    output_kwargs = {}
+    kwargs = {}
     if args.ascii:
-        output_kwargs['characters'] = AsciiCharacters
-    output_kwargs['print_time'] = args.print_time
+        kwargs['characters'] = AsciiCharacters
+    kwargs['print_time'] = args.print_time
 
-    return output_kwargs
+    output = ListOutput
+    if args.failures_only:
+        output = FailuresOnlyOutput
+
+    return output(**kwargs)
 
 
 def main():
     colorama.init()
-    parser = Parser(ListOutput(**get_output_kwargs()))
+    parser = Parser(make_output())
 
     for line in sys.stdin:
         parser.process(line)
