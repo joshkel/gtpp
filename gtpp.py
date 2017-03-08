@@ -332,8 +332,7 @@ class ListOutput(object):
                               self.characters.fail, Fore.RED,
                               ' - %i/%i failed%s' % (fail_count, test_count, time_details))
 
-        print()
-        self.needs_newline = False
+        self.printer.newline()
 
     def start_test(self, test_case, test, test_index, test_count):
         test_case_index, total_test_case_count = self.progress_counts()
