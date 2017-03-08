@@ -6,19 +6,26 @@ import colorama
 from colorama import Fore, Style
 from functools import wraps
 import re
+import shutil
 import sys
 
 
 class UnicodeCharacters:
+    width = 1
+
     empty = ' '
     success = '✓'
     fail = '✗'
+    busy = '…'
 
 
 class AsciiCharacters:
+    width = 2
+
     empty = '  '
     success = 'OK'
     fail = ' X'
+    busy = '..'
 
 
 def plural(text, count):
@@ -426,10 +433,13 @@ class ListOutput(BaseOutput):
 
 
 class FailuresOnlyOutput(BaseOutput):
-    PERCENT_WIDTH = 6
+    PERCENT_WIDTH = 5
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        columns = shutil.get_terminal_size().columns
+        self.max_test_name_len = columns - self.PERCENT_WIDTH - 4 - self.characters.width
 
         self.current_test_has_output = False
         self.total_test_count = 0
@@ -437,20 +447,26 @@ class FailuresOnlyOutput(BaseOutput):
         self.failed_test_count = 0
 
     def format_percent(self):
-        return '%5.1f%%' % (self.total_test_index / self.total_test_count * 100)
+        return '%*.1f%%' % (self.PERCENT_WIDTH, self.total_test_index / self.total_test_count * 100)
 
     def print_status(self, test_and_case, character=None, color=Fore.CYAN, include_percent=True):
-        assert(character or include_percent)
-        if include_percent:
-            line = self.format_percent() + ' ' + color
+        line = color
+        if character:
+            line += character + ' '
         else:
-            line = ' ' * 5 + color + character + ' '
+            line += ' ' * (self.characters.width + 1)
 
-        line = line + ' ' + test_and_case + Style.RESET_ALL
+        line += '%*.*s' % (-self.max_test_name_len, self.max_test_name_len, test_and_case)
+
+        if include_percent:
+            line += self.format_percent()
+
+        line += Style.RESET_ALL
+
         self.printer.print_noeol(line)
 
     def raw_output(self, test, line):
-        self.printer.print(' ' * 8 + line)
+        self.printer.print(' ' * 2 + line)
         self.current_test_has_output = True
 
     def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
@@ -463,7 +479,7 @@ class FailuresOnlyOutput(BaseOutput):
 
     def start_test(self, test_case, test, test_index, test_count):
         self.total_test_index += 1
-        self.print_status(test_case + '.' + test)
+        self.print_status(test_case + '.' + test, self.characters.busy)
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
         if self.current_test_has_output or self.is_filtered or status == 'FAILED':
