@@ -216,21 +216,85 @@ class LinePrinter(object):
         self.needs_newline = False
 
 
-class ListOutput(object):
-    """Standard test output.
-
-    Lists test cases, with more detail for failed tests."""
-
+class BaseOutput(object):
     def __init__(self, characters=UnicodeCharacters, print_time=0):
         self.characters = characters
         self.print_time = print_time
 
         self.printer = LinePrinter()
 
+        self.is_filtered = False
+
+    def format_failed(self, fail_count, test_count, test_case_count):
+        """Helper method: Formats final results if there are any failures."""
+        tests = plural('test', test_count)
+        test_cases = plural('test case', test_case_count)
+        return (' - %i/%i %s from %i %s failed'
+                % (fail_count, test_count, tests, test_case_count, test_cases))
+
+    def format_passed(self, test_count, test_case_count):
+        """Helper method: Formats final results if everything passed."""
+        tests = plural('test', test_count)
+        test_cases = plural('test case', test_case_count)
+        return (' - %i/%i %s from %i %s passed'
+                % (test_count, test_count, tests, test_case_count, test_cases))
+
+    def format_time(self, time):
+        """Helper method: Formats a time in msec for display."""
+        if time is not None and time >= self.print_time:
+            return ' (%s ms)' % time
+        else:
+            return ''
+
+    def filter(self, filter):
+        # Duplicate message from native Google Test
+        self.printer.print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
+        self.is_filtered = True
+
+    def disabled(self, disabled_test_count):
+        # Duplicate message from native Google Test
+        message = ('YOU HAVE %i DISABLED %s'
+                   % (disabled_test_count, plural('test', disabled_test_count).upper()))
+        self.printer.print(Fore.YELLOW + message + Style.RESET_ALL)
+
+    def raw_output(self, test, line):
+        raise NotImplementedError
+
+    def start_test_case(self, test_case, test_case_index, total_test_case_count, where=None):
+
+        raise NotImplementedError
+
+    def stop_test_case(self, test_case, test_case_index, total_test_case_count,
+                       test_count, fail_count, time=None):
+        raise NotImplementedError
+
+    def start_test(self, test_case, test, test_index, test_count):
+        raise NotImplementedError
+
+    def stop_test(self, status, test_case, test, test_index, test_count, time=None):
+        raise NotImplementedError
+
+    def global_setup(self, total_test_case_count):
+        raise NotImplementedError
+
+    def global_teardown(self):
+        raise NotImplementedError
+
+    def finish(self, total_test_count, total_test_case_count, time):
+        raise NotImplementedError
+
+
+class ListOutput(BaseOutput):
+    """Standard test output.
+
+    Lists test cases, with more detail for failed tests."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
         # Internal state
         self.current_test_case_has_output = False
         self.progress_len = 0
-        self.is_filtered = False
 
         self.current_test_output = []
         self.failed_test_output = OrderedDict()
@@ -256,25 +320,6 @@ class ListOutput(object):
         else:
             return self.test_case_index, self.total_test_case_count
 
-    def format_failed(self, fail_count, test_count, test_case_count):
-        tests = plural('test', test_count)
-        test_cases = plural('test case', test_case_count)
-        return (' - %i/%i %s from %i %s failed'
-                % (fail_count, test_count, tests, test_case_count, test_cases))
-
-    def format_passed(self, test_count, test_case_count):
-        tests = plural('test', test_count)
-        test_cases = plural('test case', test_case_count)
-        return (' - %i/%i %s from %i %s passed'
-                % (test_count, test_count, tests, test_case_count, test_cases))
-
-    def format_time(self, time):
-        """Implementation: Formats a time in msec for display."""
-        if time is not None and time >= self.print_time:
-            return ' (%s ms)' % time
-        else:
-            return ''
-
     def print_status(self, test_case, test_case_index, total_test_case_count, character,
                      color=None, details=None, force_progress=False, progress_space=' '):
         """Implementation: Prints a line of test / test case progress."""
@@ -296,17 +341,6 @@ class ListOutput(object):
             line += details
 
         self.printer.print_noeol(line)
-
-    def filter(self, filter):
-        # Duplicate message from native Google Test
-        self.printer.print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
-        self.is_filtered = True
-
-    def disabled(self, disabled_test_count):
-        # Duplicate message from native Google Test
-        message = ('YOU HAVE %i DISABLED %s'
-                   % (disabled_test_count, plural('test', disabled_test_count).upper()))
-        self.printer.print(Fore.YELLOW + message + Style.RESET_ALL)
 
     def raw_output(self, test, line):
         self.current_test_case_has_output = True
