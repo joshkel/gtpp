@@ -249,7 +249,7 @@ class BaseOutput(object):
 
     def filter(self, filter):
         # Duplicate message from native Google Test
-        self.printer.print(Fore.YELLOW, 'Note: Google Test filter = %s' % filter, Style.RESET_ALL)
+        self.printer.print(Fore.YELLOW + 'Note: Google Test filter = %s' % filter + Style.RESET_ALL)
         self.is_filtered = True
 
     def disabled(self, disabled_test_count):
@@ -432,6 +432,9 @@ class FailuresOnlyOutput(BaseOutput):
         super().__init__(**kwargs)
 
         self.current_test_has_output = False
+        self.total_test_count = 0
+        self.total_test_index = 0
+        self.failed_test_count = 0
 
     def format_percent(self):
         return '%5.1f%%' % (self.total_test_index / self.total_test_count * 100)
@@ -463,7 +466,7 @@ class FailuresOnlyOutput(BaseOutput):
         self.print_status(test_case + '.' + test)
 
     def stop_test(self, status, test_case, test, test_index, test_count, time=None):
-        if self.current_test_has_output or status == 'FAILED':
+        if self.current_test_has_output or self.is_filtered or status == 'FAILED':
             if status == 'FAILED':
                 self.failed_test_count += 1
                 self.print_status(test_case + '.' + test,
@@ -494,8 +497,9 @@ class FailuresOnlyOutput(BaseOutput):
                 self.failed_test_count, total_test_count, total_test_case_count)
             color = Fore.RED
             character = self.characters.fail
-        self.printer.print(
+        self.printer.print_noeol(
             color + character + ' ' + status_details + Style.RESET_ALL + time_details)
+        self.printer.newline()
 
 
 def make_output():
