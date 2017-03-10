@@ -549,20 +549,41 @@ def parse_command_line():
 
 
 def print_exit_status(process, printer):
-    wait_result = os.waitpid(process.pid, 0)[1]
-    if os.WIFSIGNALED(wait_result):
-        exit_signal = os.WTERMSIG(wait_result)
+    exit_signal = None
+    exit_code = None
+    core_dumped = False
+
+    try:
+        wait_result = os.waitpid(process.pid, 0)[1]
+        if os.WIFSIGNALED(wait_result):
+            exit_signal = os.WTERMSIG(wait_result)
+            exit_code = 128 + exit_signal
+        elif os.WIFEXITED(wait_result):
+            exit_code = os.WEXITSTATUS(wait_result)
+        core_dumped = os.WCOREDUMP(wait_result)
+    except ChildProcessError:
+        # Must be Windows; waiting for a terminated process doesn't work (?)
+        exit_code = process.returncode
+
+    if exit_signal is not None:
         signal_name = signal_names.get(exit_signal, 'unknown signal')
         printer.print(
             Fore.RED + 'Terminated by %s (%i)' % (signal_name, exit_signal) + Style.RESET_ALL)
         exit_code = 128 + exit_signal
-    elif os.WIFEXITED(wait_result):
-        exit_code = os.WEXITSTATUS(wait_result)
-    else:
-        exit_code = None
-    if os.WCOREDUMP(wait_result):
+    if core_dumped:
         printer.print(Fore.RED + 'Core dumped' + Style.RESET_ALL)
     return exit_code
+
+
+def pipe_as_text(input):
+    for line in input:
+        line = line.decode('utf')
+
+        # Normalize binary-mode Windows line endings
+        if line.endswith('\r\n'):
+            line = line[:-2] + '\n'
+
+        yield line
 
 
 def main():
@@ -578,13 +599,13 @@ def main():
             print(e)
             sys.exit(1)
         test_output = test_process.stdout
+        filter = pipe_as_text
     else:
         test_process = None
         test_output = sys.stdin
+        filter = lambda x: x
 
-    for line in test_output:
-        if type(line) != str:
-            line = line.decode('utf8')
+    for line in filter(test_output):
         parser.process(line)
 
     exit_code = None
