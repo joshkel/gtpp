@@ -5,9 +5,16 @@ from collections import OrderedDict
 import colorama
 from colorama import Fore, Style
 from functools import wraps
+import os
 import re
 import shutil
+import signal
+import subprocess
 import sys
+
+# Source: http://stackoverflow.com/a/2549950/25507
+signal_names = dict((k, v) for v, k in reversed(sorted(signal.__dict__.items()))
+                    if v.startswith('SIG') and not v.startswith('SIG_'))
 
 
 class UnicodeCharacters:
@@ -518,7 +525,7 @@ class FailuresOnlyOutput(BaseOutput):
         self.printer.newline()
 
 
-def make_output():
+def parse_command_line():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--failures-only', action='store_true',
                            help='Only failed tests (and other test output) are left on screen')
@@ -526,6 +533,7 @@ def make_output():
                            help='Use ASCII progress / status, not Unicode')
     argparser.add_argument('--print-time', type=int, default=50,
                            help='Only print times that are at least N milliseconds')
+    argparser.add_argument('command', nargs=argparse.REMAINDER)
     args = argparser.parse_args()
 
     kwargs = {}
@@ -537,21 +545,58 @@ def make_output():
     if args.failures_only:
         output = FailuresOnlyOutput
 
-    return output(**kwargs)
+    return args.command, output(**kwargs)
+
+
+def print_exit_status(process, printer):
+    wait_result = os.waitpid(process.pid, 0)[1]
+    if os.WIFSIGNALED(wait_result):
+        exit_signal = os.WTERMSIG(wait_result)
+        signal_name = signal_names.get(exit_signal, 'unknown signal')
+        printer.print(
+            Fore.RED + 'Terminated by %s (%i)' % (signal_name, exit_signal) + Style.RESET_ALL)
+        exit_code = 128 + exit_signal
+    elif os.WIFEXITED(wait_result):
+        exit_code = os.WEXITSTATUS(wait_result)
+    else:
+        exit_code = None
+    if os.WCOREDUMP(wait_result):
+        printer.print(Fore.RED + 'Core dumped' + Style.RESET_ALL)
+    return exit_code
 
 
 def main():
     colorama.init()
-    parser = Parser(make_output())
+    command, output = parse_command_line()
+    parser = Parser(output)
 
-    for line in sys.stdin:
+    if command:
+        try:
+            test_process = subprocess.Popen(
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except Exception as e:
+            print(e)
+            sys.exit(1)
+        test_output = test_process.stdout
+    else:
+        test_process = None
+        test_output = sys.stdin
+
+    for line in test_output:
+        if type(line) != str:
+            line = line.decode('utf8')
         parser.process(line)
 
+    exit_code = None
+    if test_process:
+        exit_code = print_exit_status(test_process, output.printer)
     if parser.in_test_suite:
-        print(Fore.RED + 'Test suite aborted' + Style.RESET_ALL)
-        sys.exit(1)
+        output.printer.print(Fore.RED + 'Test suite aborted' + Style.RESET_ALL)
+        sys.exit(exit_code or 1)
     elif parser.has_failures:
-        sys.exit(1)
+        sys.exit(exit_code or 1)
+    else:
+        sys.exit(exit_code or 0)
 
 
 if __name__ == '__main__':

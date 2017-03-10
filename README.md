@@ -57,7 +57,15 @@ to use.
     pip install -r requirements.txt
     ```
 
-3. Whenever you run your unit tests, pipe the results through `gtpp`.  For example:
+3. Run your unit tests through `gtpp`. For example:
+
+    ```
+    path/to/gtpp.py ./test_suite [--gtest_args...]
+    # Or
+    path/to/gtpp.py make test
+    ```
+
+    Or run your tests normally and pipe the results through `gtpp`.  For example:
 
     ```
     make test |& path/to/gtpp.py
