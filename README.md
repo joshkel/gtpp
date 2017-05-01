@@ -12,6 +12,8 @@ to use.
 
 [See these screenshots for an example.](docs/screenshots.md)
 
+(`gtpp` is not a Google project. The author is not affiliated with Google.)
+
 ## Features
 
 * Quieter output - By default, Google Test prints 2 lines of output per
