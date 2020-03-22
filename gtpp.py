@@ -99,6 +99,7 @@ class Parser(object):
         # Public properties
         self.in_test_suite = False
         self.has_failures = False    # Has any test ever failed?
+        self.is_summarizing_failures = False
 
     def process(self, line):
         if not self.handler.process(self, line):
