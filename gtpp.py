@@ -99,6 +99,7 @@ class Parser(object):
         # Public properties
         self.in_test_suite = False
         self.has_failures = False    # Has any test ever failed?
+        self.is_summarizing_failures = False
 
     def process(self, line):
         if not self.handler.process(self, line):
@@ -453,8 +454,14 @@ class FailuresOnlyOutput(BaseOutput):
         self.total_test_index = 0
         self.failed_test_count = 0
 
+    def calculate_percent(self):
+        if self.total_test_count == 0:
+            return 100
+        else:
+            return self.total_test_index / self.total_test_count * 100
+
     def format_percent(self):
-        return '%*.1f%%' % (self.PERCENT_WIDTH, self.total_test_index / self.total_test_count * 100)
+        return '%*.1f%%' % (self.PERCENT_WIDTH, self.calculate_percent())
 
     def print_status(self, test_and_case, character=None, color=Fore.CYAN, include_percent=True):
         line = color
