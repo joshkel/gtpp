@@ -102,7 +102,8 @@ class Parser(object):
 
     def process(self, line):
         if not self.handler.process(self, line):
-            self.output.raw_output(self.current_test, line)
+            #self.output.raw_output(self.current_test, line)
+            pass
 
     @staticmethod
     def parse_time(time):
