@@ -102,7 +102,8 @@ class Parser(object):
 
     def process(self, line):
         if not self.handler.process(self, line):
-            self.output.raw_output(self.current_test, line)
+            #self.output.raw_output(self.current_test, line)
+            pass
 
     @staticmethod
     def parse_time(time):
@@ -111,14 +112,14 @@ class Parser(object):
         else:
             return None
 
-    @handler.add(r'Running (\d+) tests? from (\d+) test cases?')
+    @handler.add(r'Running (\d+) tests? from (\d+) test (?:cases?|suites?)')
     def start(self, total_test_count, total_test_case_count):
         self.total_test_count = int(total_test_count)
         self.total_test_case_count = int(total_test_case_count)
         self.in_test_suite = True
         self.is_summarizing_failures = False
 
-    @handler.add(r'(\d+) tests? from (\d+) test cases? ran. ?' + TIME_RE + '$')
+    @handler.add(r'(\d+) tests? from (\d+) test (?:cases?|suites?) ran. ?' + TIME_RE + '$')
     def finish(self, total_test_count, total_test_case_count, time):
         self.output.finish(int(total_test_count), int(total_test_case_count), self.parse_time(time))
         self.in_test_suite = False
